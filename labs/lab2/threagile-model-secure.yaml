@@ -1,0 +1,348 @@
+threagile_version: 1.0.0
+
+title: Juice Shop Secure Model
+date: 2026-09-13
+
+author:
+  name: Student Name
+  homepage: https://example.edu
+
+management_summary_comment: >
+  Hardened variant of the Juice Shop training architecture. This model preserves
+  the baseline assets and flows, while adding encryption in transit, mutually
+  authenticated proxy-to-application traffic, and encryption at rest.
+
+business_criticality: important
+
+business_overview:
+  description: Training environment for DevSecOps threat-modeling practice.
+  images: []
+
+technical_overview:
+  description: >
+    A browser accesses Juice Shop directly or through a reverse proxy. Both
+    inbound paths to the application are encrypted. The proxy authenticates to
+    the application with a client certificate. Application and mounted storage
+    use encryption at rest.
+  images: []
+
+questions:
+  Do you expose port 3000 beyond localhost?: ""
+  Do you use a reverse proxy with TLS and security headers?: ""
+  Are any outbound integrations (webhooks) configured?: ""
+  Is any sensitive data stored in logs or files?: ""
+
+abuse_cases:
+  Credential Stuffing: Attackers automate attempts to guess account credentials.
+  Stored XSS: Malicious scripts are stored and later rendered in user browsers.
+  SSRF: Server-side requests are abused to reach unintended network resources.
+
+security_requirements:
+  TLS in transit: Enforce HTTPS for all browser and proxy application traffic.
+  Service authentication: Require client-certificate authentication between proxy and application.
+  Encryption at rest: Encrypt the application runtime and persistent storage.
+  AuthZ on sensitive routes: Enforce server-side role and permission checks.
+  Rate limiting: Limit automated authentication attempts.
+
+tags_available:
+  - docker
+  - nodejs
+  - pii
+  - auth
+  - tokens
+  - logs
+  - public
+  - actor
+  - user
+  - optional
+  - proxy
+  - app
+  - storage
+  - volume
+  - saas
+  - webhook
+  - primary
+  - direct
+  - egress
+
+data_assets:
+  User Accounts:
+    id: user-accounts
+    description: User profile data, credential hashes, and email addresses.
+    usage: business
+    tags: [pii, auth]
+    origin: user-supplied
+    owner: Lab Owner
+    quantity: many
+    confidentiality: confidential
+    integrity: critical
+    availability: important
+    justification_cia_rating: Authentication and personal data require strong confidentiality and integrity.
+  Orders:
+    id: orders
+    description: Order history, addresses, and payment metadata.
+    usage: business
+    tags: [pii]
+    origin: application
+    owner: Lab Owner
+    quantity: many
+    confidentiality: confidential
+    integrity: important
+    availability: important
+    justification_cia_rating: Transaction records and addresses contain sensitive personal data.
+  Product Catalog:
+    id: product-catalog
+    description: Public product names, descriptions, and prices.
+    usage: business
+    tags: [public]
+    origin: application
+    owner: Lab Owner
+    quantity: many
+    confidentiality: public
+    integrity: important
+    availability: important
+    justification_cia_rating: Product data is public but must not be modified improperly.
+  Tokens & Sessions:
+    id: tokens-sessions
+    description: Session IDs, JWTs, and CSRF tokens.
+    usage: business
+    tags: [auth, tokens]
+    origin: application
+    owner: Lab Owner
+    quantity: many
+    confidentiality: confidential
+    integrity: important
+    availability: important
+    justification_cia_rating: Disclosure permits session hijacking.
+  Logs:
+    id: logs
+    description: Application and access logs that can contain PII or secrets.
+    usage: devops
+    tags: [logs]
+    origin: application
+    owner: Lab Owner
+    quantity: many
+    confidentiality: internal
+    integrity: important
+    availability: important
+    justification_cia_rating: Logs support operations but require protected access.
+
+technical_assets:
+  User Browser:
+    id: user-browser
+    description: End-user web browser.
+    type: external-entity
+    usage: business
+    used_as_client_by_human: true
+    out_of_scope: false
+    justification_out_of_scope:
+    size: system
+    technology: browser
+    tags: [actor, user]
+    internet: true
+    machine: virtual
+    encryption: none
+    owner: External User
+    confidentiality: public
+    integrity: operational
+    availability: operational
+    justification_cia_rating: User-controlled client and potential attacker origin.
+    multi_tenant: false
+    redundant: false
+    custom_developed_parts: false
+    data_assets_processed: []
+    data_assets_stored: []
+    data_formats_accepted: [json]
+    communication_links:
+      To Reverse Proxy (preferred):
+        target: reverse-proxy
+        description: Browser to reverse proxy over HTTPS on port 443.
+        protocol: https
+        authentication: session-id
+        authorization: enduser-identity-propagation
+        tags: [primary]
+        vpn: false
+        ip_filtered: false
+        readonly: false
+        usage: business
+        data_assets_sent: [tokens-sessions]
+        data_assets_received: [product-catalog]
+      Direct to App (no proxy):
+        target: juice-shop
+        description: Direct browser access to the application over HTTPS.
+        protocol: https
+        authentication: session-id
+        authorization: enduser-identity-propagation
+        tags: [direct]
+        vpn: false
+        ip_filtered: false
+        readonly: false
+        usage: business
+        data_assets_sent: [tokens-sessions]
+        data_assets_received: [product-catalog]
+
+  Reverse Proxy:
+    id: reverse-proxy
+    description: Reverse proxy that terminates TLS and adds security headers.
+    type: process
+    usage: business
+    used_as_client_by_human: false
+    out_of_scope: false
+    justification_out_of_scope:
+    size: application
+    technology: reverse-proxy
+    tags: [optional, proxy]
+    internet: false
+    machine: virtual
+    encryption: transparent
+    owner: Lab Owner
+    confidentiality: internal
+    integrity: important
+    availability: important
+    justification_cia_rating: Protected host-side gateway for inbound traffic.
+    multi_tenant: false
+    redundant: false
+    custom_developed_parts: false
+    data_assets_processed: [product-catalog, tokens-sessions]
+    data_assets_stored: []
+    data_formats_accepted: [json]
+    communication_links:
+      To App:
+        target: juice-shop
+        description: Proxy-to-application HTTPS with mutual TLS authentication.
+        protocol: https
+        authentication: client-certificate
+        authorization: technical-user
+        tags: []
+        vpn: false
+        ip_filtered: false
+        readonly: false
+        usage: business
+        data_assets_sent: [tokens-sessions]
+        data_assets_received: [product-catalog]
+
+  Juice Shop Application:
+    id: juice-shop
+    description: OWASP Juice Shop Node.js and Express server.
+    type: process
+    usage: business
+    used_as_client_by_human: false
+    out_of_scope: false
+    justification_out_of_scope:
+    size: application
+    technology: web-server
+    tags: [app, nodejs]
+    internet: false
+    machine: container
+    encryption: data-with-symmetric-shared-key
+    owner: Lab Owner
+    confidentiality: internal
+    integrity: important
+    availability: important
+    justification_cia_rating: The application handles sensitive business and identity data.
+    multi_tenant: false
+    redundant: false
+    custom_developed_parts: true
+    data_assets_processed: [user-accounts, orders, product-catalog, tokens-sessions]
+    data_assets_stored: [logs]
+    data_formats_accepted: [json]
+    communication_links:
+      To Challenge WebHook:
+        target: webhook-endpoint
+        description: Optional outbound HTTPS callback after a challenge is solved.
+        protocol: https
+        authentication: none
+        authorization: none
+        tags: [egress]
+        vpn: false
+        ip_filtered: false
+        readonly: false
+        usage: business
+        data_assets_sent: [orders]
+
+  Persistent Storage:
+    id: persistent-storage
+    description: Host-mounted database, upload, and log volume.
+    type: datastore
+    usage: devops
+    used_as_client_by_human: false
+    out_of_scope: false
+    justification_out_of_scope:
+    size: component
+    technology: file-server
+    tags: [storage, volume]
+    internet: false
+    machine: virtual
+    encryption: data-with-symmetric-shared-key
+    owner: Lab Owner
+    confidentiality: internal
+    integrity: important
+    availability: important
+    justification_cia_rating: The volume can contain the database, uploads, and logs.
+    multi_tenant: false
+    redundant: false
+    custom_developed_parts: false
+    data_assets_processed: []
+    data_assets_stored: [logs, user-accounts, orders, product-catalog]
+    data_formats_accepted: [file]
+    communication_links: {}
+
+  Webhook Endpoint:
+    id: webhook-endpoint
+    description: External third-party webhook receiver, if configured.
+    type: external-entity
+    usage: business
+    used_as_client_by_human: false
+    out_of_scope: true
+    justification_out_of_scope: Third-party service is outside the lab owner's control.
+    size: system
+    technology: web-service-rest
+    tags: [saas, webhook]
+    internet: true
+    machine: virtual
+    encryption: none
+    owner: Third-Party
+    confidentiality: internal
+    integrity: operational
+    availability: operational
+    justification_cia_rating: External integration point receiving outbound notification data.
+    multi_tenant: true
+    redundant: true
+    custom_developed_parts: false
+    data_assets_processed: [orders]
+    data_assets_stored: []
+    data_formats_accepted: [json]
+    communication_links: {}
+
+trust_boundaries:
+  Internet:
+    id: internet
+    description: Untrusted public network.
+    type: network-dedicated-hoster
+    tags: []
+    technical_assets_inside: [user-browser, webhook-endpoint]
+    trust_boundaries_nested: [host]
+  Host:
+    id: host
+    description: Local host or VM running Docker.
+    type: network-dedicated-hoster
+    tags: []
+    technical_assets_inside: [reverse-proxy, persistent-storage]
+    trust_boundaries_nested: [container-network]
+  Container Network:
+    id: container-network
+    description: Isolated Docker network for application containers.
+    type: network-dedicated-hoster
+    tags: []
+    technical_assets_inside: [juice-shop]
+    trust_boundaries_nested: []
+
+shared_runtimes:
+  Docker Host:
+    id: docker-host
+    description: Docker Engine and default bridge network.
+    tags: [docker]
+    technical_assets_running: [juice-shop]
+
+individual_risk_categories: {}
+risk_tracking: {}
