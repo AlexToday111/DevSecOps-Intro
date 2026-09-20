@@ -1,0 +1,3 @@
+# Public SSH fingerprint in the required git signature evidence, not a secret.
+# Scoped to this rule, file and line; do not ignore the whole submissions path.
+submissions/lab3.md:generic-api-key:31
